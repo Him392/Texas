@@ -1,3 +1,6 @@
+# 该项目预计于2022年春节期间进行优化重制
+
+
 # 3D预览：
 Texas_ALL.stl
 https://raw.githubusercontent.com/Him392/Texas/main/%E5%B1%8F%E5%B9%95%E6%88%AA%E5%9B%BE%202021-03-21%20145915.png?token=AMDSIMWFFZNWY4JIL26C56LAK3XYM
