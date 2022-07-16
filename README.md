@@ -12,3 +12,6 @@ Texas2.stl
 Texas_A＆B.DWG（CAD文件，淘宝上定做亚克力板用）
 Texas_A＆B.STL（3D模型）
 Texas_A＆B.max（3DSMAX原文件）
+
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a><br />
