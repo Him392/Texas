@@ -1,6 +1,7 @@
 # 该项目预计于2022年春节期间进行优化重制
-咕了，暑假一定
+咕了，~~暑假一定~~咕咕咕*2
 
+视频链接：https://www.bilibili.com/video/BV1i34y1r77z
 
 # 3D预览：
 Texas_ALL.stl
@@ -12,3 +13,6 @@ Texas2.stl
 Texas_A＆B.DWG（CAD文件，淘宝上定做亚克力板用）
 Texas_A＆B.STL（3D模型）
 Texas_A＆B.max（3DSMAX原文件）
+
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a><br />
