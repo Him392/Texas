@@ -1,6 +1,7 @@
 # 该项目预计于2022年春节期间进行优化重制
 咕了，~~暑假一定~~咕咕咕*2
 
+##视频链接：https://www.bilibili.com/video/BV1i34y1r77z
 
 # 3D预览：
 Texas_ALL.stl
