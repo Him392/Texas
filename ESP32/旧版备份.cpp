@@ -196,7 +196,7 @@ void setup() {
 }
 
 void loop() {
-
+/*
   while (USBPowerState == true) {
     brightness += fadeAmount;
     if (brightness <= 0 || brightness >= 30) {
@@ -205,7 +205,7 @@ void loop() {
     ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
     delay(30);
   }
-
+*/
   switch (Mode) {
     case 0:
       ledcAnalogWrite(LEDC_CHANNEL_0, 0);
