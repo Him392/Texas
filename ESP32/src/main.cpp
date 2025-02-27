@@ -17,7 +17,7 @@ bool USBPowerState = false;
 unsigned int Mode = 0, Temp_mode = 0;
 
 int brightness = 128;
-int fadeAmount = 5;
+int fadeAmount = 2;
 
 AsyncWebServer server(80);
 
@@ -28,30 +28,59 @@ void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255) {
   ledcWrite(channel, duty);
 }
 
-void IRAM_ATTR handleButtonPress() {
-  static unsigned long lastPressTime = 0;
-  unsigned long currentTime = millis();
+// 按键中断处理函数
+volatile bool isLongPress = false;  // 记录是否已触发长按
+volatile bool buttonHeld = false;   // 按键是否被按住
+hw_timer_t *pressTimer = NULL;      // 定时器
 
-  if (currentTime - lastPressTime > 200) { // 200ms 防抖
-    portENTER_CRITICAL_ISR(&mux); // 进入临界区，防止多核访问冲突
-    Temp_mode = Mode;
-    Mode = (Mode + 1) % 4;
-    portEXIT_CRITICAL_ISR(&mux); // 退出临界区
+#define LONG_PRESS_TIME 250 // 250ms 作为长按阈值
+
+void IRAM_ATTR handleLongPress() {
+  if (buttonHeld) {  // 只有按住时才触发
+    isLongPress = true;
+    if (Mode >= 1 && Mode <= 3) {
+      Mode = (Mode % 3) + 1;  // 1 → 2 → 3 → 1 循环
+    }
   }
-
-  lastPressTime = currentTime;
 }
 
+void IRAM_ATTR handleButtonPress() {
+  static unsigned long pressStartTime = 0;
+  unsigned long currentTime = millis();
 
+  if (!buttonHeld) {  
+    buttonHeld = true;
+    isLongPress = false; // 重置长按状态
+    pressStartTime = currentTime;
+    timerAlarmWrite(pressTimer, LONG_PRESS_TIME * 1000, false); // 250ms 后触发
+    timerRestart(pressTimer);
+    timerAlarmEnable(pressTimer);
+  } else {  
+    unsigned long pressDuration = currentTime - pressStartTime;
+    buttonHeld = false;
+    timerAlarmDisable(pressTimer); // 释放按键后禁用定时器
+
+    if (!isLongPress) {  // 如果长按已经触发，就不执行短按逻辑
+      if (Mode != 0) {
+        Mode = 0;  
+      } else if (Mode == 0) {
+        Mode = 1;  
+      }
+    }
+  }
+}
 
 void setup() {
-  
+  // 初始化定时器（1 号定时器，80 分频，即 1us 计数）
+  pressTimer = timerBegin(1, 80, true);
+  timerAttachInterrupt(pressTimer, &handleLongPress, true);
+
   Serial.begin(115200);
   Serial.println();
   Serial.println("正在配置接入点...");
 
   pinMode(SwitchPin, INPUT); // 触摸按键用下拉模式
-  attachInterrupt(digitalPinToInterrupt(SwitchPin), handleButtonPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(SwitchPin), handleButtonPress, CHANGE);
 
 
   WiFi.softAP(ssid, password);
@@ -90,7 +119,7 @@ void setup() {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', '/setMode?value=' + mode, true);
       xhr.send();
-      if (mode === 1) { 
+      if (mode === 1 || mode === 3) { 
         document.getElementById('brightnessRange').disabled = false;
       } else {
         document.getElementById('brightnessRange').disabled = true;
@@ -109,25 +138,28 @@ void setup() {
     request->send(200, "text/html", html);
   });
 
-  server.on("/setMode", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("value")) {
-      String modeValue = request->getParam("value")->value();
-      Mode = modeValue.toInt();
-      Serial.printf("设置模式为: %d\n", Mode);
-      if (Mode == 2) {
-        brightness = 0;
-      }
+server.on("/setMode", HTTP_GET, [](AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    String modeValue = request->getParam("value")->value();
+    Mode = modeValue.toInt();
+    Serial.printf("设置模式为: %d\n", Mode);
+    if (Mode == 2) {
+      brightness = 0;
     }
-    request->send(200, "text/plain", "OK");
-  });
+  }
+  request->send(200, "text/plain", "OK");
+});
 
-  server.on("/brightness", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("value")) {
-      String brightnessValue = request->getParam("value")->value();
-      brightness = brightnessValue.toInt();
+server.on("/brightness", HTTP_GET, [](AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    String brightnessValue = request->getParam("value")->value();
+    brightness = brightnessValue.toInt();
+    if (Mode == 1 || Mode == 3) {
+      ledcAnalogWrite(LEDC_CHANNEL_0, brightness); // 实时更新亮度
     }
-    request->send(200, "text/plain", "OK");
-  });
+  }
+  request->send(200, "text/plain", "OK");
+});
 
   server.begin();
   pinMode(12, INPUT_PULLUP); // 让 GPIO 12 上拉
@@ -138,24 +170,26 @@ ledcAttachPin(LED_PIN, LEDC_CHANNEL_0);
 }
 
 void loop() {
+  
   Serial.printf("当前模式: %d, 亮度: %d\n", Mode, brightness);
     switch (Mode) {
       case 0:
         ledcAnalogWrite(LEDC_CHANNEL_0, 0);
         break;
       case 1:
-        ledcAnalogWrite(LEDC_CHANNEL_0, 255);
+        ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
         break;
       case 2:
           brightness += fadeAmount;
           if (brightness <= 0 || brightness >= 255) fadeAmount = -fadeAmount;
           ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
+          delay(20);
         break;
       case 3:
+        ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
+        delay(100);
         ledcAnalogWrite(LEDC_CHANNEL_0, 0);
-        delay(50);
-        ledcAnalogWrite(LEDC_CHANNEL_0, 127);
-        delay(50);
+        delay(100);
         break;
     }
   }
