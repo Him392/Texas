@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>ESP32 WebController</title>
+	</head>
+	<body>
+		<h1>Web Controller</h1>
+		<button onclick="test()" type="button" style="height: 100px;width: 200px;background-color: #1aa6f67d;border: 0px;">Test</button>
+	</body>
+	<script type="text/javascript">
+		function test() {
+			var ajax = new XMLHttpRequest();
+			ajax.open('get', '/test');
+			ajax.send();
+			ajax.onreadystatechange = function() {
+				if (ajax.readyState == 4 && ajax.status == 200) {
+					console.log(ajax.responseText);
+				}
+			}
+		}
+	</script>
+</html>
+
