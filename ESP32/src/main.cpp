@@ -1,0 +1,195 @@
+#include <Arduino.h> 
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
+
+#define LEDC_CHANNEL_0     0
+#define LEDC_TIMER_8_BIT   12
+#define LEDC_BASE_FREQ     5000
+#define LED_PIN            12
+
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED; // 定义一个多核锁
+
+const char* ssid     = "ESP32-LED-1";
+const char* password = "";
+
+unsigned int SwitchPin = 2, USBPowerPin = 36;
+bool USBPowerState = false;
+unsigned int Mode = 0, Temp_mode = 0;
+
+int brightness = 128;
+int fadeAmount = 2;
+
+AsyncWebServer server(80);
+
+// LED PWM 控制
+void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255) {
+  uint32_t duty = map(value, 0, valueMax, 0, 4095);
+  duty = pow((float)duty / 4095.0, 2.2) * 4095;
+  ledcWrite(channel, duty);
+}
+
+// 按键中断处理函数
+volatile bool isLongPress = false;  // 记录是否已触发长按
+volatile bool buttonHeld = false;   // 按键是否被按住
+hw_timer_t *pressTimer = NULL;      // 定时器
+
+#define LONG_PRESS_TIME 250 // 250ms 作为长按阈值
+
+void IRAM_ATTR handleLongPress() {
+  if (buttonHeld) {  // 只有按住时才触发
+    isLongPress = true;
+    if (Mode >= 1 && Mode <= 3) {
+      Mode = (Mode % 3) + 1;  // 1 → 2 → 3 → 1 循环
+    }
+  }
+}
+
+void IRAM_ATTR handleButtonPress() {
+  static unsigned long pressStartTime = 0;
+  unsigned long currentTime = millis();
+
+  if (!buttonHeld) {  
+    buttonHeld = true;
+    isLongPress = false; // 重置长按状态
+    pressStartTime = currentTime;
+    timerAlarmWrite(pressTimer, LONG_PRESS_TIME * 1000, false); // 250ms 后触发
+    timerRestart(pressTimer);
+    timerAlarmEnable(pressTimer);
+  } else {  
+    unsigned long pressDuration = currentTime - pressStartTime;
+    buttonHeld = false;
+    timerAlarmDisable(pressTimer); // 释放按键后禁用定时器
+
+    if (!isLongPress) {  // 如果长按已经触发，就不执行短按逻辑
+      if (Mode != 0) {
+        Mode = 0;  
+      } else if (Mode == 0) {
+        Mode = 1;  
+      }
+    }
+  }
+}
+
+void setup() {
+  // 初始化定时器（1 号定时器，80 分频，即 1us 计数）
+  pressTimer = timerBegin(1, 80, true);
+  timerAttachInterrupt(pressTimer, &handleLongPress, true);
+
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println("正在配置接入点...");
+
+  pinMode(SwitchPin, INPUT); // 触摸按键用下拉模式
+  attachInterrupt(digitalPinToInterrupt(SwitchPin), handleButtonPress, CHANGE);
+
+
+  WiFi.softAP(ssid, password);
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP地址: ");
+  Serial.println(myIP);
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String html = R"rawliteral(
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ESP32 LED 控制</title>
+    <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+    h1 { font-size: 24px; }
+    p { font-size: 18px; }
+    button { font-size: 18px; margin: 5px; padding: 10px; }
+    input[type="range"] { width: 100%; }
+    </style>
+    </head>
+    <body>
+    <h1>ESP32 LED 控制</h1>
+    <p>当前模式: <span id="currentMode"></span></p>
+    <div>
+    <button onclick="setMode(0)">关闭</button>
+    <button onclick="setMode(1)">开启</button>
+    <button onclick="setMode(2)">呼吸</button>
+    <button onclick="setMode(3)">闪烁</button>
+    </div>
+    <p>亮度控制: <input type="range" min="0" max="255" value="128" id="brightnessRange" onchange="setBrightness(this.value)" disabled></p>
+    <script>
+    function setMode(mode) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/setMode?value=' + mode, true);
+      xhr.send();
+      if (mode === 1 || mode === 3) { 
+        document.getElementById('brightnessRange').disabled = false;
+      } else {
+        document.getElementById('brightnessRange').disabled = true;
+        document.getElementById('brightnessRange').value = 0;
+      }
+    }
+    function setBrightness(value) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/brightness?value=' + value, true);
+      xhr.send();
+    }
+    </script>
+    </body>
+    </html>
+    )rawliteral";
+    request->send(200, "text/html", html);
+  });
+
+server.on("/setMode", HTTP_GET, [](AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    String modeValue = request->getParam("value")->value();
+    Mode = modeValue.toInt();
+    Serial.printf("设置模式为: %d\n", Mode);
+    if (Mode == 2) {
+      brightness = 0;
+    }
+  }
+  request->send(200, "text/plain", "OK");
+});
+
+server.on("/brightness", HTTP_GET, [](AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    String brightnessValue = request->getParam("value")->value();
+    brightness = brightnessValue.toInt();
+    if (Mode == 1 || Mode == 3) {
+      ledcAnalogWrite(LEDC_CHANNEL_0, brightness); // 实时更新亮度
+    }
+  }
+  request->send(200, "text/plain", "OK");
+});
+
+  server.begin();
+  pinMode(12, INPUT_PULLUP); // 让 GPIO 12 上拉
+delay(100);
+pinMode(12, OUTPUT);
+ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_TIMER_8_BIT);
+ledcAttachPin(LED_PIN, LEDC_CHANNEL_0);
+}
+
+void loop() {
+  
+  Serial.printf("当前模式: %d, 亮度: %d\n", Mode, brightness);
+    switch (Mode) {
+      case 0:
+        ledcAnalogWrite(LEDC_CHANNEL_0, 0);
+        break;
+      case 1:
+        ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
+        break;
+      case 2:
+          brightness += fadeAmount;
+          if (brightness <= 0 || brightness >= 255) fadeAmount = -fadeAmount;
+          ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
+          delay(20);
+        break;
+      case 3:
+        ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
+        delay(100);
+        ledcAnalogWrite(LEDC_CHANNEL_0, 0);
+        delay(100);
+        break;
+    }
+  }
