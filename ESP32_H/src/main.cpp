@@ -3,6 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include "web_server.h"
 #include "button_handler.h"
+#include "led_pwm.h"
 
 #define LEDC_CHANNEL_0     0
 #define LEDC_TIMER_8_BIT   12
@@ -22,13 +23,6 @@ int brightness = 128;
 int fadeAmount = 2;
 
 AsyncWebServer server(80);
-
-// LED PWM 控制
-void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255) {
-  uint32_t duty = map(value, 0, valueMax, 0, 4095);
-  duty = pow((float)duty / 4095.0, 2.2) * 4095;
-  ledcWrite(channel, duty);
-}
 
 // 按键中断处理函数
 volatile bool isLongPress = false;  // 记录是否已触发长按
@@ -90,80 +84,8 @@ void setup() {
   Serial.print("AP IP地址: ");
   Serial.println(myIP);
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String html = R"rawliteral(
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ESP32 LED 控制</title>
-    <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-    h1 { font-size: 24px; }
-    p { font-size: 18px; }
-    button { font-size: 18px; margin: 5px; padding: 10px; }
-    input[type="range"] { width: 100%; }
-    </style>
-    </head>
-    <body>
-    <h1>ESP32 LED 控制</h1>
-    <p>当前模式: <span id="currentMode"></span></p>
-    <div>
-    <button onclick="setMode(0)">关闭</button>
-    <button onclick="setMode(1)">开启</button>
-    <button onclick="setMode(2)">呼吸</button>
-    <button onclick="setMode(3)">闪烁</button>
-    </div>
-    <p>亮度控制: <input type="range" min="0" max="255" value="128" id="brightnessRange" onchange="setBrightness(this.value)" disabled></p>
-    <script>
-    function setMode(mode) {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', '/setMode?value=' + mode, true);
-      xhr.send();
-      if (mode === 1 || mode === 3) { 
-        document.getElementById('brightnessRange').disabled = false;
-      } else {
-        document.getElementById('brightnessRange').disabled = true;
-        document.getElementById('brightnessRange').value = 0;
-      }
-    }
-    function setBrightness(value) {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', '/brightness?value=' + value, true);
-      xhr.send();
-    }
-    </script>
-    </body>
-    </html>
-    )rawliteral";
-    request->send(200, "text/html", html);
-  });
+  setupWebServer();
 
-server.on("/setMode", HTTP_GET, [](AsyncWebServerRequest *request) {
-  if (request->hasParam("value")) {
-    String modeValue = request->getParam("value")->value();
-    Mode = modeValue.toInt();
-    Serial.printf("设置模式为: %d\n", Mode);
-    if (Mode == 2) {
-      brightness = 0;
-    }
-  }
-  request->send(200, "text/plain", "OK");
-});
-
-server.on("/brightness", HTTP_GET, [](AsyncWebServerRequest *request) {
-  if (request->hasParam("value")) {
-    String brightnessValue = request->getParam("value")->value();
-    brightness = brightnessValue.toInt();
-    if (Mode == 1 || Mode == 3) {
-      ledcAnalogWrite(LEDC_CHANNEL_0, brightness); // 实时更新亮度
-    }
-  }
-  request->send(200, "text/plain", "OK");
-});
-
-  server.begin();
   pinMode(12, INPUT_PULLUP); // 让 GPIO 12 上拉
 delay(100);
 pinMode(12, OUTPUT);
@@ -176,7 +98,7 @@ void loop() {
   Serial.printf("当前模式: %d, 亮度: %d\n", Mode, brightness);
     switch (Mode) {
       case 0:
-        ledcAnalogWrite(LEDC_CHANNEL_0, 0);
+        ledcAnalogWrite(LEDC_CHANNEL_0, 0,);
         break;
       case 1:
         ledcAnalogWrite(LEDC_CHANNEL_0, brightness);
