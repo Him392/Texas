@@ -1,5 +1,6 @@
 #include <Arduino.h> 
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <ESPAsyncWebServer.h>
 //全局参数
 #define LEDC_CHANNEL_0     0
@@ -102,6 +103,7 @@ void setup() {
 
   WiFi.softAP(ssid, password);
   IPAddress myIP = WiFi.softAPIP();
+  esp_wifi_set_max_tx_power(WIFI_POWER_11dBm);
   Serial.print("AP IP地址: ");
   Serial.println(myIP);
 
