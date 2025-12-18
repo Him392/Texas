@@ -7,12 +7,12 @@
 #define LEDC_TIMER_8_BIT   12
 #define LEDC_BASE_FREQ     8191//只给了14bit
 #define LED_PIN            12
-#define DebugON            1  // 1开启打印日志和超控，0关闭
+#define Debug            1  // 1开启打印日志和超控，0关闭
 #define SAMPLE_COUNT       10  // 采样次数
 
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED; // 定义一个多核锁
 
-const char* ssid     = "ESP32-LED-1";
+const char* ssid     = "德克萨斯的源石剑-B";
 const char* password = "";
 // 引脚定义
 unsigned int SwitchPin = 2, USBPowerPin = 36,BATPin=37;
@@ -23,7 +23,7 @@ unsigned long lastLogTime = 0;
 int USBpower=0;
 float BATvotage=0;
 int brightness = 128;
-int fadeAmount = 2;
+int fadeAmount = 1;
 
 AsyncWebServer server(80);
 
@@ -31,6 +31,7 @@ AsyncWebServer server(80);
 void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255) {
   uint32_t duty = map(value, 0, valueMax, 0, 4095);
   duty = pow((float)duty / 4095.0, 2.2) * 4095;
+  duty = map(duty,0,4095,1000,4095);
   ledcWrite(channel, duty);
 }
 
@@ -267,7 +268,7 @@ setInterval(() => {
 
 
 void loop() {
-if (millis() - lastLogTime >= 1000) {  // 每秒执行一次
+if (millis() - lastLogTime >= 500) { 
   lastLogTime = millis();  // 先更新时间，避免累积误差
 
   // USB判定，直接布尔表达
@@ -278,7 +279,7 @@ if (millis() - lastLogTime >= 1000) {  // 每秒执行一次
   BATvotage = readBatteryVoltage();
 
   // 串口日志输出（可关闭）
-  if (DebugON) {
+  if (Debug) {
     Serial.printf(
       "模式:%d | 亮度:%d | 电压:%.2fV | USB:%s\n",
       Mode, brightness, BATvotage,
@@ -287,7 +288,7 @@ if (millis() - lastLogTime >= 1000) {  // 每秒执行一次
   }
 }
 
-  if (USBPowerState&&!DebugON)
+  if (USBPowerState&&!Debug)
   {
     Mode=0;
   }
