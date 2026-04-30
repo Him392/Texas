@@ -13,8 +13,8 @@
 ### 手柄部分（3D 打印）
 | 文件 | 说明 |
 |------|------|
-| `Texas_1PCB.STL` / `.SLDPRT` | 手柄主体（含 PCB 安装位） |
-| `Texas_2SW.STL` / `.SLDPRT` | 手柄按键盖 |
+| `Texas_1PCB.STL` / `.SLDPRT` | 手柄主体（装PCB的那面） |
+| `Texas_2SW.STL` / `.SLDPRT` | 手柄主体（装开关的那面 |
 
 ### 剑身部分
 | 文件 | 说明 |
@@ -31,7 +31,7 @@
 
 ## 固件
 
-固件基于 **ESP32-PICO** 平台（PlatformIO + Arduino 框架），LED 通过 LEDC PWM 驱动，支持 Gamma 校正，提供两个版本：
+固件基于 **ESP32-PICO** 平台（PlatformIO + Arduino 框架），LED 通过 LEDC PWM 驱动，提供两个版本：
 
 ### ESP32_AP — WiFi 热点控制版
 
