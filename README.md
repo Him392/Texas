@@ -1,6 +1,8 @@
-# 德克萨斯 源石剑 自制道具（重制版）
+# 德克萨斯 源石剑 自制道具
 
 明日方舟「德克萨斯」源石剑的自制道具，包含 3D 打印手柄、亚克力剑身以及 ESP32 LED 控制固件。
+
+Web BLE控制->https://him392.github.io/Texas/
 
 视频链接：https://www.bilibili.com/video/BV1i34y1r77z
 
